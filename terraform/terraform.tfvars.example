@@ -1,0 +1,10 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+# terraform.tfvars is gitignored for security
+
+project_id = "your-project-id"
+region     = "us-central1"
+
+# Optional: Override defaults if needed
+# dataset_location = "US"
+# topic_name = "banking-transactions"
+# dataset_id = "fraud_detection"

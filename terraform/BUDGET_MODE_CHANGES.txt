@@ -1,0 +1,74 @@
+# Budget Mode Configuration Changes for main.tf
+# Apply these changes to reduce costs to under $2
+
+# ============================================================
+# CHANGE 1: Silver Layer Schedule (Line ~125)
+# ============================================================
+# ORIGINAL:
+#   schedule = "every 5 minutes"
+# 
+# CHANGE TO:
+#   schedule = "every 30 minutes"
+
+
+# ============================================================
+# CHANGE 2: Gold Fraud Metrics Schedule (Line ~175)
+# ============================================================
+# ORIGINAL:
+#   schedule = "every 10 minutes"
+# 
+# CHANGE TO:
+#   schedule = "every 1 hours"
+
+
+# ============================================================
+# CHANGE 3: Gold Merchant Analytics Schedule (Line ~265)
+# ============================================================
+# ORIGINAL:
+#   schedule = "every 15 minutes"
+# 
+# CHANGE TO:
+#   schedule = "every 1 hours"
+
+
+# ============================================================
+# OPTIONAL: Add Data Retention (Add after line ~36)
+# ============================================================
+# Add this inside google_bigquery_table "bronze_transactions":
+#
+#   time_partitioning {
+#     type          = "DAY"
+#     expiration_ms = 86400000  # 1 day (delete after 24 hours)
+#     field         = "timestamp"
+#   }
+
+
+# ============================================================
+# COST SAVINGS SUMMARY
+# ============================================================
+# Before:  ~$17/month or ~$0.56/day
+# After:   ~$3/month or ~$0.10/day
+# 
+# For 1-hour test: ~$0.50
+# ============================================================
+
+
+# ============================================================
+# HOW TO APPLY THESE CHANGES
+# ============================================================
+# Option 1: Manual Edit
+#   Open terraform/main.tf in a text editor
+#   Find each "schedule" line and update the value
+#
+# Option 2: Use sed (Linux/Mac)
+#   cd terraform
+#   sed -i 's/every 5 minutes/every 30 minutes/g' main.tf
+#   sed -i 's/every 10 minutes/every 1 hours/g' main.tf
+#   sed -i 's/every 15 minutes/every 1 hours/g' main.tf
+#
+# Option 3: Use PowerShell (Windows)
+#   cd terraform
+#   (Get-Content main.tf) -replace 'every 5 minutes','every 30 minutes' | Set-Content main.tf
+#   (Get-Content main.tf) -replace 'every 10 minutes','every 1 hours' | Set-Content main.tf
+#   (Get-Content main.tf) -replace 'every 15 minutes','every 1 hours' | Set-Content main.tf
+# ============================================================
