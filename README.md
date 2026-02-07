@@ -314,6 +314,8 @@ See [docs/BUDGET_GUIDE.md](docs/BUDGET_GUIDE.md) for detailed optimization strat
 
 ## Looker Studio Dashboard
 
+📊 **[View Example Dashboard](https://lookerstudio.google.com/reporting/2aa6f494-5b21-4b77-8094-8249f1f07737)**
+
 Connect to Gold layer tables for visualization:
 
 **Recommended Charts:**
