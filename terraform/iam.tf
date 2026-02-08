@@ -1,6 +1,10 @@
 # IAM configuration for the streaming pipeline
 
 # Service Account for Pub/Sub to BigQuery
+# pubsub-bq-writer
+#  - Used by the BigQuery subscription
+#  - Needs: bigquery.dataEditor + bigquery.jobUser
+#  - Writes messages from Pub/Sub to BigQuery
 resource "google_service_account" "pubsub_bq_sa" {
   account_id   = "pubsub-bq-writer"
   display_name = "Pub/Sub to BigQuery Writer"
@@ -24,6 +28,10 @@ resource "google_service_account" "pubsub_bq_sa" {
 # }
 
 # Service account for scheduled queries
+# bq-transfer-runner
+#  - Used by scheduled queries
+#  - Needs: bigquery.admin
+#  - Runs the ETL transformations
 resource "google_service_account" "bq_transfer_sa" {
   account_id   = "bq-transfer-runner"
   display_name = "BigQuery Transfer Service Account"

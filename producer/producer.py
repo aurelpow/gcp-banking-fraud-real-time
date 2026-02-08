@@ -99,7 +99,7 @@ def publish_callback(future: pubsub_v1.publisher.futures.Future) -> None:
     try:
         message_id = future.result()
     except Exception as e:
-        print(f"❌ Error publishing message: {e}")
+        print(f"Error publishing message: {e}")
 
 
 def main():

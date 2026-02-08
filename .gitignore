@@ -40,3 +40,6 @@ service-account-*.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Ruff cache
+.ruff_cache/
