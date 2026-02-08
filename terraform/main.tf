@@ -171,7 +171,7 @@ resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
           WHEN JSON_EXTRACT_SCALAR(data, '$.merchant') = 'Gas_Station' THEN 'Fuel'
           ELSE 'Other'
         END AS merchant_category,
-        PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp')) AS transaction_timestamp,
+        PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp')) AS transaction_timestamp,
         CAST(JSON_EXTRACT_SCALAR(data, '$.is_fraud_candidate') AS BOOL) AS is_fraud_candidate,
         -- Calculate risk score based on amount and fraud flag
         CASE 
@@ -188,8 +188,8 @@ resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
           WHEN CAST(JSON_EXTRACT_SCALAR(data, '$.amount') AS FLOAT64) < 1000 THEN 'Large ($200-$1000)'
           ELSE 'Very Large (>$1000)'
         END AS amount_bucket,
-        EXTRACT(HOUR FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS hour_of_day,
-        FORMAT_TIMESTAMP('%A', PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS day_of_week,
+        EXTRACT(HOUR FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS hour_of_day,
+        FORMAT_TIMESTAMP('%A', PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS day_of_week,
         CURRENT_TIMESTAMP() AS ingestion_timestamp
       FROM `${var.project_id}.${google_bigquery_dataset.medallion_db.dataset_id}.bronze_transactions`
       WHERE JSON_EXTRACT_SCALAR(data, '$.transaction_id') IS NOT NULL

@@ -50,7 +50,7 @@ if [ -z "$configs" ]; then
 else
   count=0
   for config_id in $configs; do
-    bq update --transfer_config --update_credentials $config_id >/dev/null 2>&1 && {
+    bq update --transfer_config $config_id >/dev/null 2>&1 && {
       echo "   ✅ Enabled: $(basename $config_id)"
       count=$((count+1))
     } || echo "   ⚠️  Failed to enable: $(basename $config_id)"
