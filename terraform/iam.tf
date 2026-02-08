@@ -1,10 +1,10 @@
 # IAM configuration for the streaming pipeline
 
-# Service Account for Pub/Sub to BigQuery
+# Service account intended for Pub/Sub-to-BigQuery workloads
 # pubsub-bq-writer
-#  - Used by the BigQuery subscription
+#  - Can be used by components that write from Pub/Sub to BigQuery
 #  - Needs: bigquery.dataEditor + bigquery.jobUser
-#  - Writes messages from Pub/Sub to BigQuery
+#  - Identity for performing BigQuery writes on behalf of the pipeline
 resource "google_service_account" "pubsub_bq_sa" {
   account_id   = "pubsub-bq-writer"
   display_name = "Pub/Sub to BigQuery Writer"
