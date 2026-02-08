@@ -1,6 +1,10 @@
-# Monitoring and Alerting Configuration - Simplified for Budget Mode
+# Monitoring and Alerting Configuration
 
 # Pub/Sub Dead Letter Topic for failed messages
+# Purpose:
+# - Captures failed messages
+# - Allows debugging of ingestion errors
+# - Prevents message loss
 resource "google_pubsub_topic" "dead_letter" {
   name = "${var.topic_name}-dead-letter"
 }

@@ -1,22 +1,33 @@
-# terraform/main.tf
+# Terraform configuration for GCP streaming data pipeline with Pub/Sub and BigQuery
+
+# Define the Google provider with project and region settings
 provider "google" {
   project     = var.project_id
   region      = var.region
   credentials = var.credentials_file != "" ? file(var.credentials_file) : null
 }
 
-# 1. The Entry Point: Pub/Sub Topic
+# The Entry Point: Pub/Sub Topic
+# - Creates a message queue topic called banking-transactions
+# - This is the enrty point where our local producer will publish messages (transaction events)
+# - Its like a "mailbox" in the cloud that accepts messages from everywhere and holds them until our pipeline processes them
 resource "google_pubsub_topic" "fraud_events" {
   name = var.topic_name
 }
 
-# 2. The Bronze Layer: BigQuery Dataset
+# The Bronze Layer: BigQuery Dataset
+# - Create a Database container called "meddallion_db" to hold all our tables
+# - All tables will live inside this dataset 
+# - Set the geagraphic location
 resource "google_bigquery_dataset" "medallion_db" {
   dataset_id = var.dataset_id
   location   = var.dataset_location
 }
 
-# 3. The Bronze Table (Raw Data)
+# The Bronze Table (Raw Data)
+# - Create the raw data table
+# - Stores exactly what comes from Pub/Sub
+# - No transformations, just raw ingestion
 resource "google_bigquery_table" "bronze_transactions" {
   dataset_id          = google_bigquery_dataset.medallion_db.dataset_id
   table_id            = "bronze_transactions"
@@ -33,7 +44,11 @@ resource "google_bigquery_table" "bronze_transactions" {
 EOF
 }
 
-# 4. The "Magic" Link: BigQuery Subscription
+# The "Magic" Component: BigQuery Subscription
+# - Createsa direct connection from Pub/sub -> BigQuery
+# - Severless, automatic ingestion : No code needed, just configuration
+# - When a message arrives in Pub/Sub, GCP automatically takes that message and inserts it into the bronze_transactions table in BigQuery
+# - Latency < 1 second from publish to BigQuery
 resource "google_pubsub_subscription" "bq_sub" {
   name  = "bq-bronze-subscription"
   topic = google_pubsub_topic.fraud_events.name
@@ -47,7 +62,13 @@ resource "google_pubsub_subscription" "bq_sub" {
   depends_on = [google_bigquery_table.bronze_transactions]
 }
 
-# 5. The Silver Layer: Cleaned and Enriched Data
+# The Silver Layer: Cleaned and Enriched Data
+# - Creates the cleaned/enriched data table 
+# - Will be populated by the scheduled query 
+# - Schema includes :
+#   --Parsed transaction fields (transaction_id, user_id, amount, merchant, timestamp)
+#   --Enriched fields (merchant_category, risk_score, amount_bucket)
+#   --Temporal features (hour_of_day, day_of_week)
 resource "google_bigquery_table" "silver_transactions" {
   dataset_id          = google_bigquery_dataset.medallion_db.dataset_id
   table_id            = "silver_transactions"
@@ -71,7 +92,12 @@ resource "google_bigquery_table" "silver_transactions" {
 EOF
 }
 
-# 6. The Gold Layer: Aggregated Metrics
+# The Gold Layer: Aggregated Metrics
+# - Creates the aggregated metrics table
+# - Ready for dashboard/BI tools
+# - Pre-calculated for fast queries
+
+# Gold Layer: Fraud Metrics
 resource "google_bigquery_table" "gold_fraud_metrics" {
   dataset_id          = google_bigquery_dataset.medallion_db.dataset_id
   table_id            = "gold_fraud_metrics"
@@ -93,7 +119,7 @@ resource "google_bigquery_table" "gold_fraud_metrics" {
 EOF
 }
 
-# 7. Gold Layer: Merchant Analytics
+# Gold Layer: Merchant Analytics
 resource "google_bigquery_table" "gold_merchant_analytics" {
   dataset_id          = google_bigquery_dataset.medallion_db.dataset_id
   table_id            = "gold_merchant_analytics"
@@ -113,7 +139,14 @@ resource "google_bigquery_table" "gold_merchant_analytics" {
 EOF
 }
 
-# 8. Scheduled Query for Silver Layer Transformation
+# Scheduled Query for Silver Layer Transformation
+# - Input : bronze_transactions (raw data)
+# - Output : silver_transactions (cleaned/enriched data)
+# Does : 
+#   -- Parses raw JSON data into structured fields
+#   -- Enriches data with merchant categories and risk scores
+#   -- Adds temporal features for time-based analysis
+#   -- Deduplicates (only inserts new transactions that haven't been processed before)
 resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
   display_name           = "silver-layer-transformation"
   location               = var.dataset_location
@@ -138,7 +171,7 @@ resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
           WHEN JSON_EXTRACT_SCALAR(data, '$.merchant') = 'Gas_Station' THEN 'Fuel'
           ELSE 'Other'
         END AS merchant_category,
-        PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp')) AS transaction_timestamp,
+        PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp')) AS transaction_timestamp,
         CAST(JSON_EXTRACT_SCALAR(data, '$.is_fraud_candidate') AS BOOL) AS is_fraud_candidate,
         -- Calculate risk score based on amount and fraud flag
         CASE 
@@ -155,8 +188,8 @@ resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
           WHEN CAST(JSON_EXTRACT_SCALAR(data, '$.amount') AS FLOAT64) < 1000 THEN 'Large ($200-$1000)'
           ELSE 'Very Large (>$1000)'
         END AS amount_bucket,
-        EXTRACT(HOUR FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS hour_of_day,
-        FORMAT_TIMESTAMP('%A', PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS day_of_week,
+        EXTRACT(HOUR FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS hour_of_day,
+        FORMAT_TIMESTAMP('%A', PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S', JSON_EXTRACT_SCALAR(data, '$.timestamp'))) AS day_of_week,
         CURRENT_TIMESTAMP() AS ingestion_timestamp
       FROM `${var.project_id}.${google_bigquery_dataset.medallion_db.dataset_id}.bronze_transactions`
       WHERE JSON_EXTRACT_SCALAR(data, '$.transaction_id') IS NOT NULL
@@ -174,7 +207,14 @@ resource "google_bigquery_data_transfer_config" "silver_layer_etl" {
   ]
 }
 
-# 9. Scheduled Query for Gold Layer - Fraud Metrics
+# Scheduled Query for Gold Layer - Fraud Metrics
+# - Input : silver_transactions (cleaned/enriched data)
+# - Output : gold_fraud_metrics (aggregated metrics)
+# Does :
+#   -- Aggregates by hour
+#   -- Calculates fraud rates
+#   -- Identifies top merchants
+#   -- Counts high risk users
 resource "google_bigquery_data_transfer_config" "gold_fraud_metrics_etl" {
   display_name           = "gold-fraud-metrics-aggregation"
   location               = var.dataset_location
@@ -201,7 +241,7 @@ resource "google_bigquery_data_transfer_config" "gold_fraud_metrics_etl" {
       ),
       top_merchants AS (
         SELECT 
-          metric_timestamp,
+          TIMESTAMP_TRUNC(transaction_timestamp, HOUR) AS metric_timestamp,
           ARRAY_AGG(merchant ORDER BY transaction_count DESC LIMIT 1)[OFFSET(0)] AS top_merchant
         FROM (
           SELECT 
@@ -250,7 +290,13 @@ resource "google_bigquery_data_transfer_config" "gold_fraud_metrics_etl" {
   ]
 }
 
-# 10. Scheduled Query for Gold Layer - Merchant Analytics
+# Scheduled Query for Gold Layer - Merchant Analytics
+# - Input : silver_transactions (cleaned/enriched data)
+# - Output : gold_merchant_analytics (aggregated metrics)
+# Does :
+#   -- Aggregates transaction metrics by merchant and category on an hourly basis
+#   -- Calculates fraud counts and rates per merchant
+#   -- Computes total and average transaction volumes
 resource "google_bigquery_data_transfer_config" "gold_merchant_analytics_etl" {
   display_name           = "gold-merchant-analytics-aggregation"
   location               = var.dataset_location
