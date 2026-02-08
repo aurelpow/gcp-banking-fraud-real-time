@@ -36,10 +36,9 @@ echo.
 
 REM Re-enable scheduled queries
 echo 2. Re-enabling BigQuery scheduled queries...
-for /f "tokens=*" %%i in ('bq ls --transfer_config --project_id^=%PROJECT_ID% --transfer_location^=us --format^=csv[no-heading]^(name^) 2^>nul') do (
-  bq update --transfer_config --update_credentials %%i >nul 2>&1
-  echo    Enabled: %%i
-)
+bq update --transfer_config projects/1063460452195/locations/us/transferConfigs/69b70f34-0000-20ec-b8b3-14223bb2f6ea >nul 2>&1 && echo    Enabled: silver-layer-transformation || echo    Not found: silver-layer-transformation
+bq update --transfer_config projects/1063460452195/locations/us/transferConfigs/698c1b29-0000-26e1-b0e9-2405887af508 >nul 2>&1 && echo    Enabled: gold-fraud-metrics-aggregation || echo    Not found: gold-fraud-metrics-aggregation
+bq update --transfer_config projects/1063460452195/locations/us/transferConfigs/69c01b19-0000-2ef8-8582-747446fe2e74 >nul 2>&1 && echo    Enabled: gold-merchant-analytics-aggregation || echo    Not found: gold-merchant-analytics-aggregation
 echo.
 
 echo ==========================================
