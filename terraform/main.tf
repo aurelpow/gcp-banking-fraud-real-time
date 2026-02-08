@@ -7,18 +7,18 @@ provider "google" {
   credentials = var.credentials_file != "" ? file(var.credentials_file) : null
 }
 
-# The Entry Point: Pub/Sub Topic
+# The entry Point: Pub/Sub Topic
 # - Creates a message queue topic called banking-transactions
-# - This is the enrty point where our local producer will publish messages (transaction events)
-# - Its like a "mailbox" in the cloud that accepts messages from everywhere and holds them until our pipeline processes them
+# - This is the entry point where our local producer will publish messages (transaction events)
+# - It's like a "mailbox" in the cloud that accepts messages from everywhere and holds them until our pipeline processes them
 resource "google_pubsub_topic" "fraud_events" {
   name = var.topic_name
 }
 
 # The Bronze Layer: BigQuery Dataset
-# - Create a Database container called "meddallion_db" to hold all our tables
-# - All tables will live inside this dataset 
-# - Set the geagraphic location
+# - Create a BigQuery dataset to hold all our pipeline tables
+# - All tables will live inside this dataset (ID is configured via var.dataset_id)
+# - Set the geographic location
 resource "google_bigquery_dataset" "medallion_db" {
   dataset_id = var.dataset_id
   location   = var.dataset_location
@@ -45,8 +45,8 @@ EOF
 }
 
 # The "Magic" Component: BigQuery Subscription
-# - Createsa direct connection from Pub/sub -> BigQuery
-# - Severless, automatic ingestion : No code needed, just configuration
+# - Creates a direct connection from Pub/Sub -> BigQuery
+# - Serverless, automatic ingestion : No code needed, just configuration
 # - When a message arrives in Pub/Sub, GCP automatically takes that message and inserts it into the bronze_transactions table in BigQuery
 # - Latency < 1 second from publish to BigQuery
 resource "google_pubsub_subscription" "bq_sub" {
@@ -241,7 +241,7 @@ resource "google_bigquery_data_transfer_config" "gold_fraud_metrics_etl" {
       ),
       top_merchants AS (
         SELECT 
-          TIMESTAMP_TRUNC(transaction_timestamp, HOUR) AS metric_timestamp,
+          metric_timestamp,
           ARRAY_AGG(merchant ORDER BY transaction_count DESC LIMIT 1)[OFFSET(0)] AS top_merchant
         FROM (
           SELECT 
